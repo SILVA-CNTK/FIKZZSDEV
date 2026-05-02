@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Block Blast Version FIKZZS</title>
+<style>
+body {margin:0;background:#111;font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;}
+#game {background:#1f1f1f;padding:15px;border-radius:16px;box-shadow:0 0 40px #ff00aa;}
+canvas {background:#0a0a0a;border:5px solid #ff00aa;display:block;margin-bottom:10px;}
+#ui {color:#ff00aa;font-size:26px;text-align:center;}
+#combo {color:#00ff9f;font-size:22px;height:30px;}
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="ui">Score: <span id="score">0</span></div>
+  <div id="combo"></div>
+  <canvas id="board" width="400" height="400"></canvas>
+</div>
+
+<script>
+// Block Blast Version FIKZZS - Full mirip
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const comboEl = document.getElementById('combo');
+
+const SIZE = 50;
+const GRID = 8;
+let board = Array.from({length: GRID}, () => Array(GRID).fill(0));
+let score = 0;
+let combo = 0;
+let pieces = [];
+let selected = null;
+let dragOffset = {x:0, y:0};
+
+const colors = ['#ff2d55', '#00ff9f', '#4d9cff', '#ffeb3b', '#e040ff', '#00f0ff'];
+
+const shapeTemplates = [
+  [1,1],[1,1], [1],[1],[1],[1], [1,1,1],[1,0,0],
+  [1,1,1],[0,1,0], [1,1],[1,0],[1,0], [1,1,1,1]
+];
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let y = 0; y < GRID; y++) {
+    for (let x = 0; x < GRID; x++) {
+      if (board  ) {
+        ctx.fillStyle = colors  -1];
+        ctx.fillRect(x*SIZE + 4, y*SIZE + 4, SIZE-8, SIZE-8);
+      }
+    }
+  }
+}
+
+function createNewPieces() {
+  pieces = [];
+  for (let i = 0; i < 3; i++) {
+    let template = shapeTemplates ;
+    let color = Math.floor(Math.random()*colors.length) + 1;
+    pieces.push({
+      shape: template,
+      color: color,
+      x: 50 + i*130,
+      y: 470
+    });
+  }
+}
+
+function animateClear(clearedLines) {
+  let alpha = 1;
+  let anim = setInterval(() => {
+    alpha -= 0.15;
+    draw();
+    ctx.globalAlpha = alpha;
+    clearedLines.forEach(pos => {
+      ctx.fillStyle = '#fff';
+      if (pos.type === 'row') ctx.fillRect(0, pos.index*SIZE, canvas.width, SIZE);
+      if (pos.type === 'col') ctx.fillRect(pos.index*SIZE, 0, SIZE, canvas.height);
+    });
+    ctx.globalAlpha = 1;
+    if (alpha <= 0) clearInterval(anim);
+  }, 30);
+}
+
+function checkAndClear() {
+  let cleared = [];
+  // rows
+  for (let y = 0; y < GRID; y++) {
+    if (board .every(cell => cell !== 0)) {
+      cleared.push({type:'row', index:y});
+      board .fill(0);
+    }
+  }
+  // columns
+  for (let x = 0; x < GRID; x++) {
+    let full = true;
+    for (let y = 0; y < GRID; y++) if (!board  ) full = false;
+    if (full) {
+      cleared.push({type:'col', index:x});
+      for (let y = 0; y < GRID; y++) board  = 0;
+    }
+  }
+
+  if (cleared.length > 0) {
+    combo++;
+    score += cleared.length * 120 * combo;
+    scoreEl.textContent = score;
+    comboEl.textContent = `COMBO x${combo}!`;
+    animateClear(cleared);
+    setTimeout(() => comboEl.textContent = '', 1400);
+  } else {
+    combo = 0;
+  }
+}
+
+canvas.addEventListener('mousedown', e => {
+  let rect = canvas.getBoundingClientRect();
+  let mx = e.clientX - rect.left;
+  let my = e.clientY - rect.top;
+
+  for (let p of pieces) {
+    if (Math.hypot(mx - p.x, my - p.y) < 70) {
+      selected = p;
+      dragOffset.x = p.x - mx;
+      dragOffset.y = p.y - my;
+      return;
+    }
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (!selected) return;
+  let rect = canvas.getBoundingClientRect();
+  selected.x = e.clientX - rect.left + dragOffset.x;
+  selected.y = e.clientY - rect.top + dragOffset.y;
+  draw();
+});
+
+canvas.addEventListener('mouseup', e => {
+  if (!selected) return;
+  let rect = canvas.getBoundingClientRect();
+  let gx = Math.floor((e.clientX - rect.left) / SIZE);
+  let gy = Math.floor((e.clientY - rect.top) / SIZE);
+
+  if (gx >= 0 && gx < GRID && gy >= 0 && gy < GRID && !board  ) {
+    board  = selected.color;
+    pieces = pieces.filter(p => p !== selected);
+    score += 20;
+    scoreEl.textContent = score;
+    checkAndClear();
+    draw();
+
+    if (pieces.length === 0) createNewPieces();
+  }
+  selected = null;
+  draw();
+});
+
+createNewPieces();
+draw();
+alert("Block Blast Version FIKZZS siap, Bangsat. Drag piece ke grid, clear baris & kolom buat combo. Jangan sampai penuh.");
+</script>
+</html>
