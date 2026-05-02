@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Block Blast Version FIKZZS</title>
+<style>
+body {
+    margin:0; background:#111; font-family:sans-serif;
+    display:flex; justify-content:center; align-items:center;
+    height:100vh; overflow:hidden;
+}
+#game {
+    background:#1f1f1f; padding:15px; border-radius:16px;
+    box-shadow:0 0 40px #ff00aa;
+}
+canvas {
+    background:#0a0a0a; border:5px solid #ff00aa;
+    display:block; margin-bottom:10px; image-rendering:pixelated;
+}
+#ui {color:#ff00aa; font-size:28px; text-align:center; font-weight:bold;}
+#combo {color:#00ff9f; font-size:22px; height:35px; text-align:center;}
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="ui">Score: <span id="score">0</span></div>
+  <div id="combo"></div>
+  <canvas id="board" width="400" height="400"></canvas>
+</div>
+
+<script>
+// ==================== BLOCK BLAST FIKZZS ====================
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+const comboEl = document.getElementById('combo');
+
+const SIZE = 50;
+const GRID = 8;
+let board = Array.from({length: GRID}, () => Array(GRID).fill(0));
+let score = 0;
+let combo = 0;
+let pieces = [];
+let selected = null;
+let dragOffset = {x:0, y:0};
+
+const colors = ['#ff2d55', '#00ff9f', '#4d9cff', '#ffeb3b', '#e040ff', '#00f0ff'];
+
+const shapeTemplates = [
+  [[1,1],[1,1]],           // 2x2
+  [[1,1,1]],               // I horizontal
+  [[1],[1],[1]],           // I vertical
+  [[1,1,1],[0,1,0]],       // T
+  [[1,1],[1,0]],           // L
+  [[1,1,1,1]],             // I panjang
+];
+
+function randomShape() {
+  return shapeTemplates[Math.floor(Math.random() * shapeTemplates.length)];
+}
+
+function drawBoard() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // Grid
+  for (let y = 0; y < GRID; y++) {
+    for (let x = 0; x < GRID; x++) {
+      if (board[y][x] !== 0) {
+        ctx.fillStyle = colors[board[y][x] - 1];
+        ctx.fillRect(x*SIZE + 4, y*SIZE + 4, SIZE-8, SIZE-8);
+        ctx.strokeStyle = '#00000044';
+        ctx.strokeRect(x*SIZE + 4, y*SIZE + 4, SIZE-8, SIZE-8);
+      }
+    }
+  }
+}
+
+function drawPieces() {
+  for (let p of pieces) {
+    ctx.fillStyle = colors[p.color - 1];
+    const shape = p.shape;
+    
+    for (let dy = 0; dy < shape.length; dy++) {
+      for (let dx = 0; dx < shape[dy].length; dx++) {
+        if (shape[dy][dx]) {
+          ctx.fillRect(
+            p.x + dx*SIZE + 4, 
+            p.y + dy*SIZE + 4, 
+            SIZE-8, SIZE-8
+          );
+        }
+      }
+    }
+  }
+}
+
+function draw() {
+  drawBoard();
+  drawPieces();
+}
+
+function createNewPieces() {
+  pieces = [];
+  for (let i = 0; i < 3; i++) {
+    pieces.push({
+      shape: randomShape(),
+      color: Math.floor(Math.random() * colors.length) + 1,
+      x: 30 + i * 130,
+      y: 470
+    });
+  }
+}
+
+function canPlace(piece, gx, gy) {
+  const shape = piece.shape;
+  for (let dy = 0; dy < shape.length; dy++) {
+    for (let dx = 0; dx < shape[dy].length; dx++) {
+      if (shape[dy][dx]) {
+        const x = gx + dx;
+        const y = gy + dy;
+        if (x < 0 || x >= GRID || y < 0 || y >= GRID || board[y][x] !== 0) {
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+function placePiece(piece, gx, gy) {
+  const shape = piece.shape;
+  for (let dy = 0; dy < shape.length; dy++) {
+    for (let dx = 0; dx < shape[dy].length; dx++) {
+      if (shape[dy][dx]) {
+        board[gy + dy][gx + dx] = piece.color;
+      }
+    }
+  }
+}
+
+function checkAndClear() {
+  let cleared = [];
+  
+  // Check rows
+  for (let y = 0; y < GRID; y++) {
+    if (board[y].every(cell => cell !== 0)) {
+      cleared.push({type:'row', index:y});
+      board[y].fill(0);
+    }
+  }
+  
+  // Check columns
+  for (let x = 0; x < GRID; x++) {
+    let full = true;
+    for (let y = 0; y < GRID; y++) {
+      if (board[y][x] === 0) full = false;
+    }
+    if (full) {
+      cleared.push({type:'col', index:x});
+      for (let y = 0; y < GRID; y++) board[y][x] = 0;
+    }
+  }
+
+  if (cleared.length > 0) {
+    combo++;
+    score += cleared.length * 100 * combo;
+    scoreEl.textContent = score;
+    comboEl.textContent = `COMBO x${combo}! 🔥`;
+    
+    setTimeout(() => {
+      comboEl.textContent = '';
+      if (pieces.length === 0) createNewPieces();
+      draw();
+    }, 800);
+  } else {
+    combo = 0;
+  }
+}
+
+// ==================== EVENT LISTENERS ====================
+canvas.addEventListener('mousedown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  for (let p of pieces) {
+    if (Math.hypot(mx - (p.x + 50), my - (p.y + 50)) < 100) {
+      selected = p;
+      dragOffset.x = p.x - mx;
+      dragOffset.y = p.y - my;
+      return;
+    }
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (!selected) return;
+  const rect = canvas.getBoundingClientRect();
+  selected.x = e.clientX - rect.left + dragOffset.x;
+  selected.y = e.clientY - rect.top + dragOffset.y;
+  draw();
+});
+
+canvas.addEventListener('mouseup', e => {
+  if (!selected) return;
+  
+  const rect = canvas.getBoundingClientRect();
+  const gx = Math.floor((e.clientX - rect.left) / SIZE);
+  const gy = Math.floor((e.clientY - rect.top) / SIZE);
+
+  if (canPlace(selected, gx, gy)) {
+    placePiece(selected, gx, gy);
+    pieces = pieces.filter(p => p !== selected);
+    score += 30;
+    scoreEl.textContent = score;
+    
+    checkAndClear();
+    draw();
+
+    if (pieces.length === 0) createNewPieces();
+  }
+
+  selected = null;
+  draw();
+});
+
+// Start Game
+createNewPieces();
+draw();
+
+alert("✅ Block Blast FIKZZS FIXED!\nDrag piece ke grid → Clear baris & kolom untuk combo gede!");
+</script>
+</html>
